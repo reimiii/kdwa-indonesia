@@ -1,0 +1,5 @@
+# ignore sqlite binaries
+node_modules/
+*.db
+*.sqlite
+*.sqlite3
