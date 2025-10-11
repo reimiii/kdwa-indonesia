@@ -23,7 +23,7 @@ See the MIT License for more details
 
 copyright (c) 2025 by cahya dsn; cahyadsn@gmail.com
 ================================================================================*/
-/* Edited by Hilmi AM on 2025-10-10 20:37:37 */
+/* Edited by Hilmi AM on 2025-10-11 10:50:29 */
 --
 -- Table structure for table wilayah
 --

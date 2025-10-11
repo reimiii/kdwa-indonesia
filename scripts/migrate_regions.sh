@@ -5,14 +5,15 @@ DATA_DIR="database"
 RAW_DB="$DATA_DIR/raw/raw_regions.db"
 REGIONS_DB="$DATA_DIR/regions.db"
 REGIONS_SQL="$DATA_DIR/regions.sql"
+REGIONS_CSV="$DATA_DIR/regions.csv"
 
-echo "=== [1/5] Checking raw database..."
+echo "=== [1/6] Checking raw database..."
 if [[ ! -f "$RAW_DB" ]]; then
   echo "Error: $RAW_DB not found. Run import_raw.sh first."
   exit 1
 fi
 
-echo "=== [2/5] Creating regions.db schema..."
+echo "=== [2/6] Creating regions.db schema..."
 rm -f "$REGIONS_DB"
 sqlite3 "$REGIONS_DB" <<'SQL'
 drop table if exists regions;
@@ -31,7 +32,7 @@ create index idx_regions_name on regions(name);
 
 SQL
 
-echo "=== [3/5] Copying data from raw_regions..."
+echo "=== [3/6] Copying data from raw_regions..."
 
 sqlite3 "$REGIONS_DB" <<SQL
 attach database '$RAW_DB' as raw;
@@ -77,12 +78,21 @@ where level = 4;
 detach database raw;
 SQL
 
-echo "=== [4/5] Exporting regions.sql..."
+echo "=== [4/6] Exporting regions.sql..."
 sqlite3 "$REGIONS_DB" .dump > "$REGIONS_SQL"
 
 grep CREATE "$REGIONS_SQL"
 
-echo "=== [5/5] Verification summary:"
+echo "=== [5/6] Exporting regions.csv..."
+sqlite3 "$REGIONS_DB" <<SQL
+.headers on
+.mode csv
+.output $REGIONS_CSV
+select * from regions;
+.output stdout
+SQL
+
+echo "=== [6/6] Verification summary:"
 sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
 
 echo "=== Done."
