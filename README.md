@@ -1,6 +1,6 @@
 # kdwa-indonesia
 ### Kumpulan Data Wilayah Administratif Indonesia
-To install dependencies:
+To install dependencies: --
 
 ```bash
 bun install
