@@ -1,42 +1,57 @@
 import { Database } from "bun:sqlite";
 import { cwd, exit } from "node:process";
-import { readdir } from "node:fs/promises";
-import { mkdir } from "node:fs/promises";
+import { readdir, mkdir } from "node:fs/promises";
 
 const table: string = "regions";
 
 async function connection() {
-  const path = `${cwd()}/database/regions.db`;
+  const path = `${cwd()}/database/regions.sqlite`;
   const file = Bun.file(path);
-  const exsist = await file.exists();
-  if (!exsist) exit(1);
+  const exist = await file.exists();
+  if (!exist) exit(1);
 
   return new Database(path);
 }
 
 export default async function run() {
-  console.log("🚀 Running export command...");
+  console.log("Running export command...");
 
   const db = await connection();
 
-  const provinces = db.query(`select * from ${table} where level = 1`).all();
-  const regenciesOrCities = db
-    .query(`select * from ${table} where level = 2`)
+  const provinces = db
+    .query(`select id, code, name, breadcrumb from ${table} where level = 1`)
     .all();
 
-  const districts = db.query(`select * from ${table} where level = 3`).all();
-  const urbanOrVillages = db
-    .query(`select * from ${table} where level = 4`)
+  const regencies = db
+    .query(`select id, code, name, breadcrumb from ${table} where level = 2`)
+    .all();
+
+  const cities = db
+    .query(`select id, code, name, breadcrumb from ${table} where level = 3`)
+    .all();
+
+  const districts = db
+    .query(`select id, code, name, breadcrumb from ${table} where level = 4`)
+    .all();
+
+  const villages = db
+    .query(
+      `select id, code, name, breadcrumb from ${table} where level in (5,6,7)`,
+    )
     .all();
 
   const outputDir = `${cwd()}/json`;
 
-  await Bun.write(`${outputDir}/1.json`, JSON.stringify(provinces));
-  await Bun.write(`${outputDir}/2.json`, JSON.stringify(regenciesOrCities));
-  await Bun.write(`${outputDir}/3.json`, JSON.stringify(districts));
-  await Bun.write(`${outputDir}/4.json`, JSON.stringify(urbanOrVillages));
+  await mkdir(outputDir, { recursive: true });
 
-  console.log(`✅ Exported records to ${outputDir}`);
+  await Bun.write(`${outputDir}/provinces.json`, JSON.stringify(provinces));
+  await Bun.write(`${outputDir}/regencies.json`, JSON.stringify(regencies));
+  await Bun.write(`${outputDir}/cities.json`, JSON.stringify(cities));
+  await Bun.write(`${outputDir}/districts.json`, JSON.stringify(districts));
+  await Bun.write(`${outputDir}/villages.json`, JSON.stringify(villages));
+
+  console.log(`Exported records to ${outputDir}`);
+
   const files = await readdir(outputDir);
-  for (const f of files) console.log(`  - ${f}`);
+  for (const f of files) console.log(`- ${f}`);
 }

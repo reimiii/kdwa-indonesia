@@ -3,7 +3,7 @@ set -euo pipefail
 
 DATA_DIR="database"
 RAW_DB="$DATA_DIR/raw/raw_regions.db"
-REGIONS_DB="$DATA_DIR/regions.db"
+REGIONS_DB="$DATA_DIR/regions.sqlite"
 REGIONS_SQL="$DATA_DIR/regions.sql"
 REGIONS_CSV="$DATA_DIR/regions.csv"
 
@@ -21,8 +21,15 @@ create table regions (
     id integer primary key autoincrement,
     code text not null unique,
     name text not null,
-    level integer, -- 1 = province, 2 = regency and city, 3 = district, 4 = urban village and village
-    type text, -- province, regency, city, district, urban village, village
+    breadcrumb text,
+    level integer not null,
+        -- 1 = province,
+        -- 2 = regency,
+        -- 3 = city,
+        -- 4 = district,
+        -- 5 = urban village,
+        -- 6 = village,
+        -- 7 = indigenous village
     parent_code text,
     foreign key (parent_code) references regions(code)
 );
@@ -37,43 +44,76 @@ echo "=== [3/6] Copying data from raw_regions..."
 sqlite3 "$REGIONS_DB" <<SQL
 attach database '$RAW_DB' as raw;
 
--- Province (length 2)
+-- Province (2 digit)
 insert into regions (code, name, level)
-select kode, nama, 1 from raw.wilayah where length(kode) = 2;
+select kode, nama, 1
+from raw.wilayah
+where length(kode) = 2;
 
--- Regency (length 5)
+-- Regency / City (5 digit)
 insert into regions (code, name, level, parent_code)
-select kode, nama, 2, substr(kode, 1, 2) from raw.wilayah where length(kode) = 5;
+select
+    kode,
+    nama,
+    case
+        when substr(kode, 4, 2) between '71' and '99' then 3 -- city
+        else 2 -- regency
+    end,
+    substr(kode, 1, 2)
+from raw.wilayah
+where length(kode) = 5;
 
--- District (length 8)
+-- District (8 digit)
 insert into regions (code, name, level, parent_code)
-select kode, nama, 3, substr(kode, 1, 5) from raw.wilayah where length(kode) = 8;
+select
+    kode,
+    nama,
+    4,
+    substr(kode, 1, 5)
+from raw.wilayah
+where length(kode) = 8;
 
--- Village (length 13)
+-- Urban Village / Village (13 digit)
 insert into regions (code, name, level, parent_code)
-select kode, nama, 4, substr(kode, 1, 8) from raw.wilayah where length(kode) = 13;
+select
+    kode,
+    nama,
+    case
+        when substr(kode, 10, 1) = '1' then 5 -- urban village
+        when substr(kode, 10, 1) = '2' then 6 -- village
+        when substr(kode, 10, 1) = '3' then 7 -- indigenous village
+    end,
+    substr(kode, 1, 8)
+from raw.wilayah
+where length(kode) = 13;
 
--- Update type Province
-update regions set type = 'province' where level = 1;
+-- Build reversed breadcrumb (child → parent)
+with recursive region_path(code, name, parent_code, breadcrumb) as (
+    select
+        code,
+        name,
+        parent_code,
+        name as breadcrumb
+    from regions
+    where parent_code is null
 
--- Update type District
-update regions set type = 'district' where level = 3;
+    union all
 
--- Update type Regency or City
+    select
+        r.code,
+        r.name,
+        r.parent_code,
+        r.name || ', ' || rp.breadcrumb
+    from regions r
+    join region_path rp on r.parent_code = rp.code
+)
+
 update regions
-    set type = case
-        when substr(code, 4, 2) between '71' and '99' then 'city'
-        else 'regency'
-    end
-where level = 2;
-
--- Update type Village or Urban Village
-update regions
-    set type = case
-        when substr(code, 10, 1) = '1' then 'urban village'
-        when substr(code, 10, 1) = '2' then 'village'
-    end
-where level = 4;
+set breadcrumb = (
+    select breadcrumb
+    from region_path
+    where region_path.code = regions.code
+);
 
 detach database raw;
 SQL

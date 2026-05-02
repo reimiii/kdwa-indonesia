@@ -5,7 +5,7 @@ filename : db/wilayah.sql
 purpose  :
 note     : Data Kode Wilayah sesuai Kepmendagri No 300.2.2-2138 Tahun 2025
 create   : 2025-05-25 14:41:15
-last edit: 2025-10-01 08:45:08
+last edit: 2026-02-13 16:45:21
 author   : cahya dsn
 ================================================================================
 This program is free software; you can redistribute it and/or modify it under the
@@ -23,7 +23,7 @@ See the MIT License for more details
 
 copyright (c) 2025 by cahya dsn; cahyadsn@gmail.com
 ================================================================================*/
-/* Edited by Hilmi AM on 2025-10-11 10:50:29 */
+/* Edited by Hilmi AM on 2026-05-02 10:32:00 */
 --
 -- Table structure for table wilayah
 --
@@ -57624,7 +57624,7 @@ VALUES
 ('53.01.30.2002','Binafun'),
 ('53.01.30.2003','Bitobe'),
 ('53.01.30.2004','Bonmuti'),
-('53.02','Kab Timor Tengah Selatan'),
+('53.02','Kabupaten Timor Tengah Selatan'),
 ('53.02.01','Kota Soe'),
 ('53.02.01.1001','SoE'),
 ('53.02.01.1002','Cendana'),
@@ -81687,7 +81687,7 @@ VALUES
 ('81.05.15.2011','Madak'),
 ('81.05.16','Ukar Sengan'),
 ('81.05.16.2001','Urung'),
-('81.05.16.2002','Kwamor Kecil Ata'),
+('81.05.16.2002','Kwamor Kecil Mata Ata'),
 ('81.05.16.2003','Kwamor Kecil Mata Wawa'),
 ('81.05.16.2004','Kwamor Besar Ena'),
 ('81.05.16.2005','Kwamor Besar Witau'),
@@ -88120,7 +88120,7 @@ VALUES
 ('95.01.40.2006','Agamoa'),
 ('95.01.40.2007','Silumarek'),
 ('95.01.40.2008','Wesaganya'),
-('95.02','Kab Pegunungan Bintang'),
+('95.02','Kabupaten Pegunungan Bintang'),
 ('95.02.01','Oksibil'),
 ('95.02.01.2001','Kabiding'),
 ('95.02.01.2002','Aldom'),
