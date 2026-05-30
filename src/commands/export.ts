@@ -1,57 +1,41 @@
 import { Database } from "bun:sqlite";
-import { cwd, exit } from "node:process";
 import { readdir, mkdir } from "node:fs/promises";
+import { exit } from "node:process";
 
-const table: string = "regions";
+const DB_PATH = `${import.meta.dir}/../../db/regions.sqlite`;
+const OUTPUT_DIR = `${import.meta.dir}/../../data/json`;
 
-async function connection() {
-  const path = `${cwd()}/db/regions.sqlite`;
-  const file = Bun.file(path);
-  const exist = await file.exists();
-  if (!exist) exit(1);
+const LEVEL_QUERIES: Record<string, string> = {
+  provinces: "select id, code, name, breadcrumb from regions where level = 1",
+  regencies: "select id, code, name, breadcrumb from regions where level = 2",
+  cities: "select id, code, name, breadcrumb from regions where level = 3",
+  districts: "select id, code, name, breadcrumb from regions where level = 4",
+  villages:
+    "select id, code, name, breadcrumb from regions where level in (5, 6, 7)",
+};
 
-  return new Database(path);
+async function openDatabase(): Promise<Database> {
+  const file = Bun.file(DB_PATH);
+  if (!(await file.exists())) {
+    console.error(`Database not found: ${DB_PATH}`);
+    console.error("Run 'bun cli update' first.");
+    exit(1);
+  }
+  return new Database(DB_PATH);
 }
 
 export default async function run() {
   console.log("Running export command...");
 
-  const db = await connection();
+  const db = await openDatabase();
+  await mkdir(OUTPUT_DIR, { recursive: true });
 
-  const provinces = db
-    .query(`select id, code, name, breadcrumb from ${table} where level = 1`)
-    .all();
+  for (const [name, query] of Object.entries(LEVEL_QUERIES)) {
+    const rows = db.query(query).all();
+    await Bun.write(`${OUTPUT_DIR}/${name}.json`, JSON.stringify(rows));
+    console.log(`  ${name}: ${rows.length} records`);
+  }
 
-  const regencies = db
-    .query(`select id, code, name, breadcrumb from ${table} where level = 2`)
-    .all();
-
-  const cities = db
-    .query(`select id, code, name, breadcrumb from ${table} where level = 3`)
-    .all();
-
-  const districts = db
-    .query(`select id, code, name, breadcrumb from ${table} where level = 4`)
-    .all();
-
-  const villages = db
-    .query(
-      `select id, code, name, breadcrumb from ${table} where level in (5,6,7)`,
-    )
-    .all();
-
-  const outputDir = `${cwd()}/data/json`;
-
-  await mkdir(outputDir, { recursive: true });
-
-  await Bun.write(`${outputDir}/provinces.json`, JSON.stringify(provinces));
-  await Bun.write(`${outputDir}/regencies.json`, JSON.stringify(regencies));
-  await Bun.write(`${outputDir}/cities.json`, JSON.stringify(cities));
-  await Bun.write(`${outputDir}/districts.json`, JSON.stringify(districts));
-  await Bun.write(`${outputDir}/villages.json`, JSON.stringify(villages));
-
-  console.log(`Exported records to ${outputDir}`);
-
-  const files = await readdir(outputDir);
-  for (const f of files) console.log(`- ${f}`);
+  db.close();
+  console.log(`Exported to ${OUTPUT_DIR}`);
 }

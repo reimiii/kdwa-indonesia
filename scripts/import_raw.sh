@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+#
+# import_raw.sh — Download and import raw wilayah data into SQLite
+#
+# Downloads the wilayah.sql dump from cahyadsn/wilayah, cleans MySQL-specific
+# syntax, and imports it into a local SQLite database for further processing.
+#
+# Usage: bash scripts/import_raw.sh
+#
+# Output:
+#   data/raw/wilayah.sql         — Original download
+#   data/raw/wilayah.cleaned.sql — Cleaned SQL (MySQL syntax removed)
+#   data/raw/raw_regions.db      — SQLite database with raw data
+#
 set -euo pipefail
 
 SQL_URL="https://raw.githubusercontent.com/cahyadsn/wilayah/refs/heads/master/db/wilayah.sql"
@@ -7,49 +20,66 @@ SQL_FILE="$DATA_DIR/wilayah.sql"
 CLEAN_FILE="$DATA_DIR/wilayah.cleaned.sql"
 RAW_DB="$DATA_DIR/raw_regions.db"
 
-echo "=== [1/6] Preparing directory..."
-mkdir -p "$DATA_DIR"
+log() { echo "=== $1"; }
 
-echo "=== [2/6] Downloading wilayah.sql from GitHub..."
-curl -# -L -o "$SQL_FILE" "$SQL_URL"
-
-echo "=== [3/6] Normalizing line endings..."
-if command -v dos2unix >/dev/null 2>&1; then
-  dos2unix "$SQL_FILE" >/dev/null
-else
-  sed -i 's/\r$//' "$SQL_FILE"
-fi
-
-echo "=== [4/6] Cleaning MySQL-specific syntax..."
-perl -0777 -pe '
-  s/`//g;
-  s/^\s*CREATE DATABASE.*?;\n//gmi;
-  s/^\s*USE\s+\S+;\n//gmi;
-  s/\)\s*ENGINE=[^;]+;/);/gi;
-  s/DEFAULT CHARSET=[^;]+;//gi;
-  s/AUTO_INCREMENT/AUTOINCREMENT/gi;
-  s/\bUNSIGNED\b//gi;
-  s/\bVARCHAR\(\d+\)/TEXT/gi;
-  s/\bINT\(\d+\)/INTEGER/gi;
-  s/LOCK TABLES.*?UNLOCK TABLES;//gis;
-  s/\/\*\![0-9]+.*?\*\///gs;
-' "$SQL_FILE" > "$CLEAN_FILE"
-
-awk -v date="$(date '+%Y-%m-%d %H:%M:%S')" '
-/\*\// && !done {
-  print $0 "\n/* Edited by Hilmi AM on " date " */"
-  done=1
-  next
+prepare_directory() {
+  log "[1/5] Creating directory: $DATA_DIR"
+  mkdir -p "$DATA_DIR"
 }
-{ print }' "$CLEAN_FILE" > "${CLEAN_FILE}.tmp" && mv "${CLEAN_FILE}.tmp" "$CLEAN_FILE"
 
-echo "=== [5/6] Importing into SQLite..."
-rm -f "$RAW_DB"
-sqlite3 "$RAW_DB" < "$CLEAN_FILE"
+download_source() {
+  log "[2/5] Downloading wilayah.sql from GitHub..."
+  curl -# -L -o "$SQL_FILE" "$SQL_URL"
+}
 
-echo "=== [6/6] Verification: existing tables"
-sqlite3 "$RAW_DB" "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;" | head -n 10
+normalize_line_endings() {
+  log "[3/5] Normalizing line endings..."
+  if command -v dos2unix >/dev/null 2>&1; then
+    dos2unix "$SQL_FILE" >/dev/null
+  else
+    sed -i 's/\r$//' "$SQL_FILE"
+  fi
+}
 
-echo "=== Done."
-echo "Output SQLite: $RAW_DB"
-echo "Cleaned SQL:   $CLEAN_FILE"
+clean_mysql_syntax() {
+  log "[4/5] Cleaning MySQL-specific syntax..."
+  perl -0777 -pe '
+    s/`//g;
+    s/^\s*CREATE DATABASE.*?;\n//gmi;
+    s/^\s*USE\s+\S+;\n//gmi;
+    s/\)\s*ENGINE=[^;]+;/);/gi;
+    s/DEFAULT CHARSET=[^;]+;//gi;
+    s/AUTO_INCREMENT/AUTOINCREMENT/gi;
+    s/\bUNSIGNED\b//gi;
+    s/\bVARCHAR\(\d+\)/TEXT/gi;
+    s/\bINT\(\d+\)/INTEGER/gi;
+    s/LOCK TABLES.*?UNLOCK TABLES;//gis;
+    s/\/\*\![0-9]+.*?\*\///gs;
+  ' "$SQL_FILE" > "$CLEAN_FILE"
+}
+
+import_into_sqlite() {
+  log "[5/5] Importing into SQLite..."
+  rm -f "$RAW_DB"
+  sqlite3 "$RAW_DB" < "$CLEAN_FILE"
+
+  local table_count
+  table_count=$(sqlite3 "$RAW_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+  log "Imported $table_count tables into $RAW_DB"
+}
+
+main() {
+  prepare_directory
+  download_source
+  normalize_line_endings
+  clean_mysql_syntax
+  import_into_sqlite
+
+  log "Done."
+  echo "Output:"
+  echo "  Original  : $SQL_FILE"
+  echo "  Cleaned   : $CLEAN_FILE"
+  echo "  SQLite DB : $RAW_DB"
+}
+
+main

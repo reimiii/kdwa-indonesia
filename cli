@@ -1,46 +1,33 @@
 #!/usr/bin/env bun
 import { readdir } from "node:fs/promises";
 
+const COMMANDS_DIR = `${import.meta.dir}/src/commands`;
 const [command, ..._args] = Bun.argv.slice(2);
 
-async function listCommands() {
-  const dir = `${import.meta.dir}/src/commands`;
-  const result: string[] = [];
-
+async function listCommands(): Promise<string[]> {
   try {
-    const files = await readdir(dir);
-    for await (const file of files) {
-      if (file.endsWith(".ts")) {
-        result.push(file.replace(".ts", ""));
-      }
-    }
-  } catch (_) {}
+    const files = await readdir(COMMANDS_DIR);
+    return files
+      .filter((f) => f.endsWith(".ts") && !f.includes(".test."))
+      .map((f) => f.replace(".ts", ""));
+  } catch {
+    return [];
+  }
+}
 
-  return result;
+function printHelp(commands: string[]): never {
+  console.log("Usage: bun cli <command>");
+  console.log("Commands:");
+  for (const c of commands) console.log(`  ${c}`);
+  console.log("  test  (run with: bun test)");
+  process.exit(command === undefined ? 0 : 1);
 }
 
 async function main() {
   const commands = await listCommands();
 
-  if (!command) {
-    console.log("Usage: bun cli <command>");
-    console.log("Available commands:");
-    for (const c of commands) console.log(`  - ${c}`);
-    console.log("  - test (run with: bun test)");
-    return;
-  }
-
-  if (command === "test") {
-    console.log("Run tests with: bun test");
-    return;
-  }
-
-  if (!commands.includes(command)) {
-    console.log(`Unknown command: ${command}`);
-    console.log("Available commands:");
-    for (const c of commands) console.log(`  - ${c}`);
-    console.log("  - test (run with: bun test)");
-    return;
+  if (!command || !commands.includes(command)) {
+    printHelp(commands);
   }
 
   const mod = await import(`./src/commands/${command}.ts`);
