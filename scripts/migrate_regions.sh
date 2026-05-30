@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+#
+# migrate_regions.sh — Transform raw wilayah data into the normalized regions table
+#
+# Reads from the raw SQLite database (imported by import_raw.sh), classifies each
+# region by level, builds hierarchical breadcrumbs, and exports the schema + data
+# as portable SQL files.
+#
+# Usage: bash scripts/migrate_regions.sh
+#
+# Prerequisites: data/raw/raw_regions.db must exist (run import_raw.sh first)
+#
+# Output:
+#   db/regions.sqlite      — Normalized SQLite database
+#   db/dump/schema.sql     — DDL only (CREATE TABLE + indexes)
+#   db/dump/data.sql       — Batched INSERT statements (idempotent)
+#
 set -euo pipefail
 
 RAW_DIR="data/raw"
@@ -10,15 +26,20 @@ REGIONS_DB="$DB_DIR/regions.sqlite"
 DDL_SQL="$DUMP_DIR/schema.sql"
 DATA_SQL="$DUMP_DIR/data.sql"
 
-echo "=== [1/4] Checking raw database..."
-if [[ ! -f "$RAW_DB" ]]; then
-  echo "Error: $RAW_DB not found. Run import_raw.sh first."
-  exit 1
-fi
+log() { echo "=== $1"; }
 
-echo "=== [2/4] Creating regions.db schema..."
-rm -f "$REGIONS_DB"
-sqlite3 "$REGIONS_DB" <<'SQL'
+check_raw_database() {
+  log "[1/4] Checking raw database..."
+  if [[ ! -f "$RAW_DB" ]]; then
+    echo "Error: $RAW_DB not found. Run import_raw.sh first."
+    exit 1
+  fi
+}
+
+create_schema() {
+  log "[2/4] Creating regions database and importing data..."
+  rm -f "$REGIONS_DB"
+  sqlite3 "$REGIONS_DB" <<'SQL'
 drop table if exists regions;
 create table regions (
     id integer primary key autoincrement,
@@ -41,147 +62,105 @@ create index idx_regions_parent_code on regions(parent_code);
 create index idx_regions_level on regions(level);
 create index idx_regions_name on regions(name);
 create index idx_regions_level_name on regions(level, name);
-
 SQL
 
-echo "=== [3/4] Copying data from raw_regions..."
-
-sqlite3 "$REGIONS_DB" <<SQL
+  sqlite3 "$REGIONS_DB" <<SQL
 attach database '$RAW_DB' as raw;
 
--- Province (2 digit)
 insert into regions (code, name, level)
 select kode, nama, 1
 from raw.wilayah
 where length(kode) = 2;
 
--- Regency / City (5 digit)
 insert into regions (code, name, level, parent_code)
 select
     kode,
     nama,
     case
-        when substr(kode, 4, 2) between '71' and '99' then 3 -- city
-        else 2 -- regency
+        when substr(kode, 4, 2) between '71' and '99' then 3
+        else 2
     end,
     substr(kode, 1, 2)
 from raw.wilayah
 where length(kode) = 5;
 
--- District (8 digit)
 insert into regions (code, name, level, parent_code)
-select
-    kode,
-    nama,
-    4,
-    substr(kode, 1, 5)
+select kode, nama, 4, substr(kode, 1, 5)
 from raw.wilayah
 where length(kode) = 8;
 
--- Urban Village / Village (13 digit)
 insert into regions (code, name, level, parent_code)
 select
     kode,
     nama,
     case
-        when substr(kode, 10, 1) = '1' then 5 -- urban village
-        when substr(kode, 10, 1) = '2' then 6 -- village
-        when substr(kode, 10, 1) = '3' then 7 -- indigenous village
+        when substr(kode, 10, 1) = '1' then 5
+        when substr(kode, 10, 1) = '2' then 6
+        when substr(kode, 10, 1) = '3' then 7
     end,
     substr(kode, 1, 8)
 from raw.wilayah
 where length(kode) = 13;
 
--- Build reversed breadcrumb (child → parent)
 with recursive region_path(code, name, parent_code, breadcrumb) as (
-    select
-        code,
-        name,
-        parent_code,
-        name as breadcrumb
+    select code, name, parent_code, name as breadcrumb
     from regions
     where parent_code is null
 
     union all
 
-    select
-        r.code,
-        r.name,
-        r.parent_code,
-        r.name || ', ' || rp.breadcrumb
+    select r.code, r.name, r.parent_code, r.name || ', ' || rp.breadcrumb
     from regions r
     join region_path rp on r.parent_code = rp.code
 )
-
 update regions
 set breadcrumb = (
-    select breadcrumb
-    from region_path
-    where region_path.code = regions.code
+    select breadcrumb from region_path where region_path.code = regions.code
 );
 
 detach database raw;
 SQL
+}
 
-echo "=== [4/4] Exporting schema.sql and data.sql..."
+export_schema() {
+  log "[3/4] Exporting schema.sql..."
+  mkdir -p "$DUMP_DIR"
 
-mkdir -p "$DUMP_DIR"
-
-sqlite3 "$REGIONS_DB" <<SQL
+  sqlite3 "$REGIONS_DB" <<SQL
 .headers off
 .mode list
 .output $DDL_SQL
 
 select 'PRAGMA foreign_keys = OFF;';
 
--- DROP (reverse dependency)
 select 'drop trigger if exists ' || name || ';'
-from sqlite_master
-where type = 'trigger'
-and name not like 'sqlite_%'
-
+from sqlite_master where type = 'trigger' and name not like 'sqlite_%'
 union all
-
 select 'drop index if exists ' || name || ';'
-from sqlite_master
-where type = 'index'
-and name not like 'sqlite_%'
-
+from sqlite_master where type = 'index' and name not like 'sqlite_%'
 union all
-
 select 'drop table if exists ' || name || ';'
-from sqlite_master
-where type = 'table'
-and name not like 'sqlite_%'
-
+from sqlite_master where type = 'table' and name not like 'sqlite_%'
 union all
-
--- CREATE (forward dependency)
 select sql || ';'
-from sqlite_master
-where type = 'table'
-and name not like 'sqlite_%'
-
+from sqlite_master where type = 'table' and name not like 'sqlite_%'
 union all
-
 select sql || ';'
-from sqlite_master
-where type = 'index'
-and name not like 'sqlite_%'
-
+from sqlite_master where type = 'index' and name not like 'sqlite_%'
 union all
-
 select sql || ';'
-from sqlite_master
-where type = 'trigger'
-and name not like 'sqlite_%';
+from sqlite_master where type = 'trigger' and name not like 'sqlite_%';
 
 select 'PRAGMA foreign_keys = ON;';
 
 .output stdout
 SQL
+}
 
-sqlite3 "$REGIONS_DB" <<SQL
+export_data() {
+  log "[4/4] Exporting data.sql..."
+
+  sqlite3 "$REGIONS_DB" <<SQL
 .headers off
 .mode list
 .output $DATA_SQL
@@ -191,11 +170,7 @@ select 'PRAGMA foreign_keys = OFF;';
 with numbered as (
     select
         row_number() over (order by code) as rn,
-        code,
-        name,
-        breadcrumb,
-        level,
-        parent_code
+        code, name, breadcrumb, level, parent_code
     from regions
 ),
 grouped as (
@@ -206,11 +181,8 @@ grouped as (
             quote(name) || ', ' ||
             quote(breadcrumb) || ', ' ||
             level || ', ' ||
-            case
-                when parent_code is null then 'null'
-                else quote(parent_code)
-            end ||
-        ')' as values_sql
+            case when parent_code is null then 'null' else quote(parent_code) end
+        || ')' as values_sql
     from numbered
 )
 select
@@ -224,12 +196,22 @@ select 'PRAGMA foreign_keys = ON;';
 
 .output stdout
 SQL
+}
 
-echo "=== Done."
-echo "Output:"
-echo "  SQLite DB : $REGIONS_DB"
-echo "  Schema    : $DDL_SQL"
-echo "  Data SQL  : $DATA_SQL"
-echo ""
-echo "Verification:"
-sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
+main() {
+  check_raw_database
+  create_schema
+  export_schema
+  export_data
+
+  log "Done."
+  echo "Output:"
+  echo "  SQLite DB : $REGIONS_DB"
+  echo "  Schema    : $DDL_SQL"
+  echo "  Data SQL  : $DATA_SQL"
+  echo ""
+  echo "Verification:"
+  sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
+}
+
+main

@@ -1,15 +1,16 @@
 import { cwd } from "node:process";
 
+const SCRIPTS = [
+  { name: "import_raw.sh", desc: "Download & import raw wilayah data" },
+  { name: "migrate_regions.sh", desc: "Transform raw data into regions table" },
+];
+
 export default async function run() {
-  console.log("Running update command...");
+  console.log("Running update command...\n");
 
-  const scripts = [
-    `${cwd()}/scripts/import_raw.sh`,
-    `${cwd()}/scripts/migrate_regions.sh`,
-  ];
-
-  for (const script of scripts) {
-    console.log(`Executing ${script} ...`);
+  for (const { name, desc } of SCRIPTS) {
+    const script = `${cwd()}/scripts/${name}`;
+    console.log(`[${desc}]`);
 
     const proc = Bun.spawn(["bash", script], {
       stdout: "inherit",
@@ -19,10 +20,12 @@ export default async function run() {
     const exitCode = await proc.exited;
 
     if (exitCode !== 0) {
-      console.error(`Script failed: ${script} (exit ${exitCode})`);
+      console.error(`\nFailed: ${name} (exit ${exitCode})`);
       process.exit(exitCode);
     }
+
+    console.log("");
   }
 
-  console.log("Update complete. Database is now in sync!");
+  console.log("Update complete. Database is in sync!");
 }
