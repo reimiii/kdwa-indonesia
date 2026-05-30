@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SQL_URL="https://raw.githubusercontent.com/cahyadsn/wilayah/refs/heads/master/db/wilayah.sql"
-DATA_DIR="database/raw"
+DATA_DIR="data/raw"
 SQL_FILE="$DATA_DIR/wilayah.sql"
 CLEAN_FILE="$DATA_DIR/wilayah.cleaned.sql"
 RAW_DB="$DATA_DIR/raw_regions.db"

@@ -5,7 +5,7 @@ import { readdir, mkdir } from "node:fs/promises";
 const table: string = "regions";
 
 async function connection() {
-  const path = `${cwd()}/database/regions.sqlite`;
+  const path = `${cwd()}/db/regions.sqlite`;
   const file = Bun.file(path);
   const exist = await file.exists();
   if (!exist) exit(1);
@@ -40,7 +40,7 @@ export default async function run() {
     )
     .all();
 
-  const outputDir = `${cwd()}/json`;
+  const outputDir = `${cwd()}/data/json`;
 
   await mkdir(outputDir, { recursive: true });
 

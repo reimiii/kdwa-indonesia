@@ -91620,6 +91620,8 @@ CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('regions',91599);
 CREATE INDEX idx_regions_parent_code on regions(parent_code);
+CREATE INDEX idx_regions_level on regions(level);
 CREATE INDEX idx_regions_name on regions(name);
+CREATE INDEX idx_regions_level_name on regions(level, name);
 PRAGMA writable_schema=OFF;
 COMMIT;

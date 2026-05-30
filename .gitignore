@@ -1,5 +1,13 @@
-# ignore sqlite binaries
+# dependencies
 node_modules/
+
+# sqlite databases
 *.db
 *.sqlite
 *.sqlite3
+
+# raw data (downloaded)
+data/raw/
+
+# ide
+.idea
