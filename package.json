@@ -1,6 +1,6 @@
 {
   "name": "kdwa-indonesia",
-  "module": "geo",
+  "module": "cli",
   "type": "module",
   "private": true,
   "devDependencies": {

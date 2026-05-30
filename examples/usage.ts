@@ -2,13 +2,13 @@ type Region = {
   id: number;
   code: string;
   name: string;
-  level: number;            // 1 = province, 2 = regency/city, dll
+  level: number;
   type: "province" | "regency" | "city" | "district" | "village" | "urban village";
   parent_code: string | null;
 };
 
 const api = (level: number) =>
-  `https://raw.githubusercontent.com/reimiii/kdwa-indonesia/refs/heads/main/json/${level}.json`;
+  `https://raw.githubusercontent.com/reimiii/kdwa-indonesia/refs/heads/main/data/json/${level}.json`;
 
 async function getProvinces(url: string): Promise<Region[]> {
   const res = await fetch(url);

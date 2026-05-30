@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DATA_DIR="database"
-RAW_DB="$DATA_DIR/raw/raw_regions.db"
-REGIONS_DB="$DATA_DIR/regions.sqlite"
-REGIONS_SQL="$DATA_DIR/regions.sql"
+RAW_DIR="data/raw"
+DB_DIR="db"
+DUMP_DIR="db/dump"
+DATA_DIR="data"
+
+RAW_DB="$RAW_DIR/raw_regions.db"
+REGIONS_DB="$DB_DIR/regions.sqlite"
+REGIONS_SQL="$DUMP_DIR/regions.sql"
 REGIONS_CSV="$DATA_DIR/regions.csv"
+DDL_SQL="$DUMP_DIR/schema.sql"
+DATA_SQL="$DUMP_DIR/data.sql"
 
 echo "=== [1/6] Checking raw database..."
 if [[ ! -f "$RAW_DB" ]]; then
@@ -35,7 +41,9 @@ create table regions (
 );
 
 create index idx_regions_parent_code on regions(parent_code);
+create index idx_regions_level on regions(level);
 create index idx_regions_name on regions(name);
+create index idx_regions_level_name on regions(level, name);
 
 SQL
 
@@ -124,6 +132,7 @@ sqlite3 "$REGIONS_DB" .dump > "$REGIONS_SQL"
 grep CREATE "$REGIONS_SQL"
 
 echo "=== [5/6] Exporting regions.csv..."
+mkdir -p "$DATA_DIR"
 sqlite3 "$REGIONS_DB" <<SQL
 .headers on
 .mode csv
@@ -135,7 +144,113 @@ SQL
 echo "=== [6/6] Verification summary:"
 sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
 
+echo "=== [7/8] Exporting DDL (schema.sql)..."
+
+mkdir -p "$DUMP_DIR"
+sqlite3 "$REGIONS_DB" <<SQL
+.headers off
+.mode list
+.output $DDL_SQL
+
+select 'PRAGMA foreign_keys = OFF;';
+
+-- DROP (reverse dependency)
+select 'drop trigger if exists ' || name || ';'
+from sqlite_master
+where type = 'trigger'
+and name not like 'sqlite_%'
+
+union all
+
+select 'drop index if exists ' || name || ';'
+from sqlite_master
+where type = 'index'
+and name not like 'sqlite_%'
+
+union all
+
+select 'drop table if exists ' || name || ';'
+from sqlite_master
+where type = 'table'
+and name not like 'sqlite_%'
+
+union all
+
+-- CREATE (forward dependency)
+select sql || ';'
+from sqlite_master
+where type = 'table'
+and name not like 'sqlite_%'
+
+union all
+
+select sql || ';'
+from sqlite_master
+where type = 'index'
+and name not like 'sqlite_%'
+
+union all
+
+select sql || ';'
+from sqlite_master
+where type = 'trigger'
+and name not like 'sqlite_%';
+
+select 'PRAGMA foreign_keys = ON;';
+
+.output stdout
+SQL
+
+echo "=== [8/8] Exporting data SQL (data.sql, batched)..."
+
+sqlite3 "$REGIONS_DB" <<SQL
+.headers off
+.mode list
+.output $DATA_SQL
+
+select 'PRAGMA foreign_keys = OFF;';
+
+with numbered as (
+    select
+        row_number() over (order by code) as rn,
+        code,
+        name,
+        breadcrumb,
+        level,
+        parent_code
+    from regions
+),
+grouped as (
+    select
+        ((rn - 1) / 1000) as batch_id,
+        '(' ||
+            quote(code) || ', ' ||
+            quote(name) || ', ' ||
+            quote(breadcrumb) || ', ' ||
+            level || ', ' ||
+            case
+                when parent_code is null then 'null'
+                else quote(parent_code)
+            end ||
+        ')' as values_sql
+    from numbered
+)
+select
+    'insert into regions (code, name, breadcrumb, level, parent_code) values ' ||
+    group_concat(values_sql, ', ') ||
+    ' on conflict(code) do nothing;'
+from grouped
+group by batch_id;
+
+select 'PRAGMA foreign_keys = ON;';
+
+.output stdout
+SQL
+
 echo "=== Done."
 echo "Output:"
 echo "  SQLite DB : $REGIONS_DB"
-echo "  SQL Export: $REGIONS_SQL"
+echo "  DDL       : $DDL_SQL"
+echo "  Data SQL  : $DATA_SQL"
+echo "  Full dump : $REGIONS_SQL"
+echo "  CSV       : $REGIONS_CSV"

@@ -1,68 +1,117 @@
 # kdwa-indonesia
-### Kumpulan Data Wilayah Administratif Indonesia
-To install dependencies: --
+
+**Kumpulan Data Wilayah Administratif Indonesia**
+
+Indonesian administrative region data — provinces, regencies, cities, districts, urban villages, and villages — sourced from [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah) and exported as SQLite, SQL, CSV, and JSON.
+
+## Project Structure
+
+```
+kdwa-indonesia/
+├── cli                          # CLI entry point
+├── src/commands/
+│   ├── update.ts                # Download raw data & rebuild database
+│   └── export.ts                # Export database to JSON files
+├── scripts/
+│   ├── import_raw.sh            # Download & import raw wilayah.sql
+│   ├── migrate_regions.sh       # Transform raw data into regions table
+│   └── test.sh                  # Validation test suite
+├── db/
+│   ├── regions.sqlite           # Main SQLite database (gitignored)
+│   └── dump/
+│       ├── schema.sql           # DDL only (table + indexes)
+│       ├── data.sql             # INSERT statements (batched, idempotent)
+│       └── regions.sql          # Full .dump output
+├── data/
+│   ├── raw/
+│   │   ├── wilayah.sql          # Original source dump (gitignored)
+│   │   ├── wilayah.cleaned.sql  # MySQL-cleaned version (gitignored)
+│   │   └── raw_regions.db      # Raw import DB (gitignored)
+│   ├── regions.csv              # CSV export
+│   └── json/
+│       ├── provinces.json
+│       ├── regencies.json
+│       ├── cities.json
+│       ├── districts.json
+│       └── villages.json
+├── examples/
+│   └── usage.ts                 # Example: fetch JSON from GitHub
+└── package.json
+```
+
+## Setup
 
 ```bash
 bun install
 ```
 
----
+## Commands
 
-## Dokumentasi Data Wilayah
+### Update data
 
-### Struktur Data JSON
-Setiap file di folder `json` (misal `1.json`, `2.json`, dst) berisi array data wilayah administratif Indonesia dengan struktur:
+Downloads raw data from upstream and rebuilds the SQLite database:
 
-- `level` (integer):
-	- 1 = province (provinsi)
-	- 2 = regency and city (kabupaten & kota)
-	- 3 = district (kecamatan)
-	- 4 = urban village and village (kelurahan & desa)
-- `type` (string):
-	- province, regency, city, district, urban village, village
+```bash
+bun cli update
+```
 
-### Cara Menggunakan Data
-1. Pilih file JSON sesuai level yang diinginkan.
-2. Filter data berdasarkan field `level` atau `type` sesuai kebutuhan.
+### Export to JSON
 
-### Contoh Fetch Data JSON dari URL
+Exports the database into partitioned JSON files in `data/json/`:
+
+```bash
+bun cli export
+```
+
+### Run tests
+
+```bash
+bash scripts/test.sh
+```
+
+## Data Levels
+
+| Level | Code | Description |
+|-------|------|-------------|
+| 1 | `11` | Province (provinsi) |
+| 2 | `11.01` | Regency (kabupaten) |
+| 3 | `12.72` | City (kota) |
+| 4 | `11.01.01` | District (kecamatan) |
+| 5 | `12.71.20.1001` | Urban village (kelurahan) |
+| 6 | `11.01.01.2001` | Village (desa) |
+| 7 | `95.02.01.3001` | Indigenous village (desa adat) |
+
+## Using the JSON Data
+
+Each file in `data/json/` contains an array of objects with `id`, `code`, `name`, and `breadcrumb`:
+
 ```ts
 const api = (level: number) =>
-  `https://raw.githubusercontent.com/reimiii/kdwa-indonesia/refs/heads/main/json/${level}.json`;
+  `https://raw.githubusercontent.com/reimiii/kdwa-indonesia/refs/heads/main/data/json/${level}.json`;
 
-async function getUrbanVillages(url: string) {
-  const res = await fetch(url);
-  const data = await res.json() as Region[];
-  const result = data.filter((d) => d.type === 'urban village')
-  return result;
-}
-
-async function main() {
-  const urbans = await getUrbanVillages(api(4));
-  console.log(`urban: ${urbans.length}`)
+async function getProvinces() {
+  const res = await fetch(api(1));
+  return res.json();
 }
 ```
 
-Jalankan dengan Bun:
-```bash
-bun run example.ts
-```
-
-Ganti URL sesuai lokasi file JSON yang ingin diambil.
-
-To update new data run:
+Run the example:
 
 ```bash
-bun geo update
-bun geo export
+bun run examples/usage.ts
 ```
 
----
+## Using the SQL Files
 
-## Sumber Data
+To recreate the database from SQL files:
 
-Data wilayah administratif Indonesia dalam proyek ini diperoleh dari repository berikut:
+```bash
+sqlite3 regions.sqlite < db/dump/schema.sql
+sqlite3 regions.sqlite < db/dump/data.sql
+```
 
-* [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah)
+The `data.sql` file uses `ON CONFLICT(code) DO NOTHING`, so it's safe to re-run.
 
-Terima kasih kepada penulis aslinya atas penyediaan dataset.
+## Source
+
+Data sourced from [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah).
