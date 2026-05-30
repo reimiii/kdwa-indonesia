@@ -5,7 +5,7 @@ const SCRIPTS = [
   { name: "migrate_regions.sh", desc: "Transform raw data into regions table" },
 ];
 
-export default async function run() {
+export async function run() {
   console.log("Running update command...\n");
 
   for (const { name, desc } of SCRIPTS) {

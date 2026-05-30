@@ -11,7 +11,7 @@ const PATHS = [
   "db/dump/regions.sql",
 ];
 
-export default async function run() {
+export async function run() {
   console.log("Removing generated files...\n");
 
   let removed = 0;

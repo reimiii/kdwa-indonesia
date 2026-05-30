@@ -24,7 +24,7 @@ async function openDatabase(): Promise<Database> {
   return new Database(DB_PATH);
 }
 
-export default async function run() {
+export async function run() {
   console.log("Running export command...");
 
   const db = await openDatabase();

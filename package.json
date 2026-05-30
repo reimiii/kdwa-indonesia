@@ -1,6 +1,6 @@
 {
   "name": "kdwa-indonesia",
-  "module": "cli",
+  "module": "cli.ts",
   "type": "module",
   "private": true,
   "scripts": {
