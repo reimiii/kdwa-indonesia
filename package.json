@@ -3,6 +3,9 @@
   "module": "cli",
   "type": "module",
   "private": true,
+  "scripts": {
+    "test": "bun test src/commands/test.test.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

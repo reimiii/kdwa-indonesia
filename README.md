@@ -11,23 +11,21 @@ kdwa-indonesia/
 ├── cli                          # CLI entry point
 ├── src/commands/
 │   ├── update.ts                # Download raw data & rebuild database
-│   └── export.ts                # Export database to JSON files
+│   ├── export.ts                # Export database to JSON files
+│   └── test.ts                  # Validation test suite (bun:test)
 ├── scripts/
 │   ├── import_raw.sh            # Download & import raw wilayah.sql
-│   ├── migrate_regions.sh       # Transform raw data into regions table
-│   └── test.sh                  # Validation test suite
+│   └── migrate_regions.sh       # Transform raw data into regions table
 ├── db/
 │   ├── regions.sqlite           # Main SQLite database (gitignored)
 │   └── dump/
 │       ├── schema.sql           # DDL only (table + indexes)
-│       ├── data.sql             # INSERT statements (batched, idempotent)
-│       └── regions.sql          # Full .dump output
+│       └── data.sql             # INSERT statements (batched, idempotent)
 ├── data/
 │   ├── raw/
 │   │   ├── wilayah.sql          # Original source dump (gitignored)
 │   │   ├── wilayah.cleaned.sql  # MySQL-cleaned version (gitignored)
 │   │   └── raw_regions.db      # Raw import DB (gitignored)
-│   ├── regions.csv              # CSV export
 │   └── json/
 │       ├── provinces.json
 │       ├── regencies.json
@@ -66,7 +64,7 @@ bun cli export
 ### Run tests
 
 ```bash
-bash scripts/test.sh
+bun test
 ```
 
 ## Data Levels

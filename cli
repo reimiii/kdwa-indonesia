@@ -26,6 +26,12 @@ async function main() {
     console.log("Usage: bun cli <command>");
     console.log("Available commands:");
     for (const c of commands) console.log(`  - ${c}`);
+    console.log("  - test (run with: bun test)");
+    return;
+  }
+
+  if (command === "test") {
+    console.log("Run tests with: bun test");
     return;
   }
 
@@ -33,6 +39,7 @@ async function main() {
     console.log(`Unknown command: ${command}`);
     console.log("Available commands:");
     for (const c of commands) console.log(`  - ${c}`);
+    console.log("  - test (run with: bun test)");
     return;
   }
 
