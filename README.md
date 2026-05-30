@@ -12,7 +12,8 @@ kdwa-indonesia/
 ├── src/commands/
 │   ├── update.ts                # Download raw data & rebuild database
 │   ├── export.ts                # Export database to JSON files
-│   └── test.ts                  # Validation test suite (bun:test)
+│   ├── clean.ts                 # Remove all generated files
+│   └── test.test.ts             # Validation test suite (bun:test)
 ├── scripts/
 │   ├── import_raw.sh            # Download & import raw wilayah.sql
 │   └── migrate_regions.sh       # Transform raw data into regions table
@@ -60,6 +61,16 @@ Exports the database into partitioned JSON files in `data/json/`:
 ```bash
 bun cli export
 ```
+
+### Clean generated files
+
+Removes all generated files and directories (raw data, database, dumps, JSON):
+
+```bash
+bun cli clean
+```
+
+This deletes `data/raw/`, `data/json/`, `db/regions.sqlite`, and `db/dump/*.sql`. Run `bun cli update && bun cli export` to regenerate everything.
 
 ### Run tests
 

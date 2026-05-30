@@ -1,9 +1,9 @@
 import { Database } from "bun:sqlite";
-import { readdir, mkdir } from "node:fs/promises";
-import { exit } from "node:process";
+import { mkdir } from "node:fs/promises";
+import { cwd, exit } from "node:process";
 
-const DB_PATH = `${import.meta.dir}/../../db/regions.sqlite`;
-const OUTPUT_DIR = `${import.meta.dir}/../../data/json`;
+const DB_PATH = `${cwd()}/db/regions.sqlite`;
+const OUTPUT_DIR = `${cwd()}/data/json`;
 
 const LEVEL_QUERIES: Record<string, string> = {
   provinces: "select id, code, name, breadcrumb from regions where level = 1",
