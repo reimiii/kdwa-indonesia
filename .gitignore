@@ -9,5 +9,9 @@ node_modules/
 # raw data (downloaded)
 data/raw/
 
+# generated (recreated by migrate_regions.sh)
+data/regions.csv
+db/dump/regions.sql
+
 # ide
 .idea

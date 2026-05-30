@@ -4,22 +4,19 @@ set -euo pipefail
 RAW_DIR="data/raw"
 DB_DIR="db"
 DUMP_DIR="db/dump"
-DATA_DIR="data"
 
 RAW_DB="$RAW_DIR/raw_regions.db"
 REGIONS_DB="$DB_DIR/regions.sqlite"
-REGIONS_SQL="$DUMP_DIR/regions.sql"
-REGIONS_CSV="$DATA_DIR/regions.csv"
 DDL_SQL="$DUMP_DIR/schema.sql"
 DATA_SQL="$DUMP_DIR/data.sql"
 
-echo "=== [1/6] Checking raw database..."
+echo "=== [1/4] Checking raw database..."
 if [[ ! -f "$RAW_DB" ]]; then
   echo "Error: $RAW_DB not found. Run import_raw.sh first."
   exit 1
 fi
 
-echo "=== [2/6] Creating regions.db schema..."
+echo "=== [2/4] Creating regions.db schema..."
 rm -f "$REGIONS_DB"
 sqlite3 "$REGIONS_DB" <<'SQL'
 drop table if exists regions;
@@ -47,7 +44,7 @@ create index idx_regions_level_name on regions(level, name);
 
 SQL
 
-echo "=== [3/6] Copying data from raw_regions..."
+echo "=== [3/4] Copying data from raw_regions..."
 
 sqlite3 "$REGIONS_DB" <<SQL
 attach database '$RAW_DB' as raw;
@@ -126,27 +123,10 @@ set breadcrumb = (
 detach database raw;
 SQL
 
-echo "=== [4/6] Exporting regions.sql..."
-sqlite3 "$REGIONS_DB" .dump > "$REGIONS_SQL"
-
-grep CREATE "$REGIONS_SQL"
-
-echo "=== [5/6] Exporting regions.csv..."
-mkdir -p "$DATA_DIR"
-sqlite3 "$REGIONS_DB" <<SQL
-.headers on
-.mode csv
-.output $REGIONS_CSV
-select * from regions;
-.output stdout
-SQL
-
-echo "=== [6/6] Verification summary:"
-sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
-
-echo "=== [7/8] Exporting DDL (schema.sql)..."
+echo "=== [4/4] Exporting schema.sql and data.sql..."
 
 mkdir -p "$DUMP_DIR"
+
 sqlite3 "$REGIONS_DB" <<SQL
 .headers off
 .mode list
@@ -201,8 +181,6 @@ select 'PRAGMA foreign_keys = ON;';
 .output stdout
 SQL
 
-echo "=== [8/8] Exporting data SQL (data.sql, batched)..."
-
 sqlite3 "$REGIONS_DB" <<SQL
 .headers off
 .mode list
@@ -250,7 +228,8 @@ SQL
 echo "=== Done."
 echo "Output:"
 echo "  SQLite DB : $REGIONS_DB"
-echo "  DDL       : $DDL_SQL"
+echo "  Schema    : $DDL_SQL"
 echo "  Data SQL  : $DATA_SQL"
-echo "  Full dump : $REGIONS_SQL"
-echo "  CSV       : $REGIONS_CSV"
+echo ""
+echo "Verification:"
+sqlite3 "$REGIONS_DB" "SELECT level, COUNT(*) AS count FROM regions GROUP BY level;"
